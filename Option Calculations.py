@@ -3,52 +3,34 @@ import datetime as dt
 import pandas as pd
 %matplotlib inline
 
-S0 = 4.11
-strike = 4.3
-t = get_year_deltas([dt.datetime(2018,5,9), dt.datetime(2018,8,24)])[1]    
-r = 0.025733
-sigma = 0.243957
-flavor = 'c'
+S0 = 1.43
+strike = 1.55
+t = get_year_deltas([dt.datetime(2018,7,31), dt.datetime(2018,11,30)])[1]    
+r = 0.026701
+sigma = 0.17131500
+flavor = 'Call'
 
-I = 500
-M = 150
-
-call = BSM_Option(S0, strike, t, r, sigma , flavor)   
+call = BSM_Option(S0, strike, t, r, sigma , flavor)  
 call.value()
 call.delta()
 call.vega()
 call.theta()
 call.gamma()
 call.rho()
+call.imp_vol(.174, sigma_est=0.15)
 
 
+strike = [50, 60, 65, 75]
+premium = [1,0,0,1]
+lots = [-100, 100, 100, -100]
+flavor = ['Call','Call', 'Call', 'Call']
+lotsize = 1
 
-strike = []
-premium = []
-lots = []
-lotsize = 1000
 graph_payoff(strike, premium ,flavor, lots , lotsize)
 
 
 
 
 option = pd.read_csv('C:\Transfer\Options.csv')
-
-cols = ['Principal', 'Unrealized', 'Market', 'Gamma', 'Vega', 'Theta', 'Imp. Volatility']
-
-for col in cols:
-    if col == 'Imp. Volatility':
-        data[col] = data[col].str.replace('%','').astype(float)
-    else:
-        data[col] = data[col].str.replace(',','').astype(float)
-    
-agg_fun = ['sum', 'sum', 'sum', 'sum', 'sum', 'sum', 'mean']
-agg_fun = dict(zip(cols, agg_fun))
-
-temp = option.groupby('Underlying')['Principal', 'Unrealized', 'Market', 'Gamma', 'Vega', 'Theta'].agg(agg_fun).round(4)
-
+%matplotlib inline
 graph_payoff_nova(option)
-
-
-data.groupby(['Underlying', 'Flavor','Strike'])['Qty'].sum()
-

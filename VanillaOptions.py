@@ -1,7 +1,7 @@
 from math import log, sqrt, exp
 from scipy import stats
 import numpy as np
-
+import datetime as dt
 
 class BSM_Option(object):
     '''
@@ -28,13 +28,13 @@ class BSM_Option(object):
         self.flavor = flavor
 
     def value(self):
-            if self.flavor == 'c':
+            if self.flavor == 'Call':
                 ''' Returns option value. '''
                 d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
                 d2 = d1 - self.sigma*sqrt(self.T) 
                 value = self.S0 * stats.norm.cdf(d1, 0, 1) - self.K * stats.norm.cdf(d2, 0 , 1)*exp(-self.r * self.T)
                 return value
-            elif self.flavor == 'p':
+            elif self.flavor == 'Put':
                 d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
                 d2 = d1 - self.sigma*sqrt(self.T) 
                 value = -self.S0 * stats.norm.cdf(-d1, 0, 1) + self.K * stats.norm.cdf(-d2, 0 , 1)*exp(-self.r * self.T)
@@ -44,10 +44,10 @@ class BSM_Option(object):
             
     def delta(self):
         ''' Returns delta of an option'''
-        if self.flavor == 'c':
+        if self.flavor == 'Call':
             d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
             return stats.norm.cdf(d1, 0, 1)
-        elif self.flavor == 'p':
+        elif self.flavor == 'Put':
             d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
             return -stats.norm.cdf(-d1, 0, 1)
         else:
@@ -68,14 +68,14 @@ class BSM_Option(object):
     
     def theta(self):
         ''' Returns Theta of option. '''
-        if self.flavor == 'c':
+        if self.flavor == 'Call':
             d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))   
             d2 = d1 - self.sigma*sqrt(self.T)
             p1 = - self.S0*stats.norm.pdf(d1, 0 ,1)*self.sigma/(2*sqrt(self.T))
             p2 = - self.r * self.K  * stats.norm.cdf(d2, 0 ,1) * exp(-self.r * self.T)
             theta = p1 + p2
             return theta/365
-        elif self.flavor == 'p':
+        elif self.flavor == 'Put':
             d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
             d2 = d1 - self.sigma*sqrt(self.T)
             p1 = - self.S0*stats.norm.pdf(d1, 0 ,1)*self.sigma/(2*sqrt(self.T))
@@ -86,12 +86,12 @@ class BSM_Option(object):
             return "Incorrect Flavor"
     
     def rho(self):
-        if self.flavor == 'c':
+        if self.flavor == 'Call':
             d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
             d2 = d1 - self.sigma*sqrt(self.T)
             rho =  self.K * self.T * exp(-self.r * self.T) * stats.norm.cdf(d2, 0, 1)
             return rho/100
-        elif self.flavor == 'p':
+        elif self.flavor == 'Put':
             d1 =  ((log(self.S0/self.K) +(self.r + .5*(self.sigma**2))*self.T))/(self.sigma*sqrt(self.T))
             d2 = d1 - self.sigma*sqrt(self.T)
             rho =  - self.K * self.T * exp(-self.r * self.T) * stats.norm.cdf(-d2, 0, 1)
@@ -123,21 +123,6 @@ def spread_option(s1, s2, k , t, sigma1, sigma2, cor, r):
     value = exp(-r*t)*(s1*stats.norm.cdf(d1, 0, 1) - s2*stats.norm.cdf(d2, 0, 1) - k*stats.norm.cdf(d3, 0 ,1))
     return value
     
-  
-  
-
-def GBM(S0, r, sigma, T, M, I):
-    dt = float(T) / M
-    paths = np.zeros((M + 1, I), np.float64)
-    paths[0] = S0
-    for t in range(1, M + 1):
-        rand = np.random.standard_normal(I)
-        rand = (rand - rand.mean()) / rand.std()
-        paths[t] = paths[t - 1] * np.exp((r - 0.5 * sigma ** 2) * dt +
-        sigma * np.sqrt(dt) * rand)
-    return paths
-    
-    
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
@@ -153,10 +138,11 @@ def graph_payoff(strike, premium, flavor, lots, lotsize):
         lots = lots.tolist()
     if type(flavor) is pd.Series:
         flavor = flavor.tolist()
-        
-    lb = min(strike) - 1*min(strike)
-    ub = max(strike) + 1*max(strike)
-    x = np.linspace(lb, ub)
+    
+    margin = .5*min(strike)
+    lb = min(strike) - margin
+    ub = max(strike) + margin
+    x = np.linspace(lb, ub, 500)
     pay_off = np.zeros(len(x))
     
     
@@ -194,22 +180,9 @@ def graph_payoff_nova(data):
         
     nova = pyodbc.connect('driver={SQL Server};server=vm-hou-sql01;database=nova;trusted_connection=true')
     
-#    # Get underlying fwd from description from db
-#    query = '''
-#    select prs_symb from price_symbols where prs_description in {}'''.format(tuple(underlyings))
-#    fwd = pd.read_sql(query, nova)
-#    fwd = fwd.prs_symb.tolist()
-#    
-#    # Get lotsize per lot from db
-#    query = '''
-#    select prs_ctr_size from price_symbols where prs_description in {}'''.format(tuple(underlyings))
-#    lot = pd.read_sql(query, nova)
-#    lot = lot.prs_ctr_size.tolist()
     
-#    # Check if any underlying fwd is missing
-#    if len(underlyings) != len(fwd):
-#        print('Missing Price Curve')
-#        return
+    data['Imp. Volatility'] = data['Imp. Volatility'].str.rstrip('%').astype('float') / 100.0
+    data.Expiry = pd.to_datetime(data.Expiry)
     
     #Seperate each option by underlyings
     for idx, types in enumerate(underlyings):
@@ -235,15 +208,14 @@ def graph_payoff_nova(data):
         
         if temp.shape[0] == 0:
             continue
-        
-        # Get lotsize from lots
-#        lotsize = lot
 
          
         strike = temp.Strike
         premium = temp.Premium
         lots = temp.Qty
         flavor = temp.Flavor
+        vol = temp['Imp. Volatility']
+        date = temp.Expiry
         if type(strike) is pd.Series:
             strike = strike.tolist()
         if type(premium) is pd.Series:
@@ -252,58 +224,89 @@ def graph_payoff_nova(data):
             lots = lots.tolist()
         if type(flavor) is pd.Series:
             flavor = flavor.tolist()
-        
+        if type(vol) is pd.Series:
+            vol = vol.tolist()
+        if type(date) is pd.Series:
+            date = date.tolist()
+            
         # Set bounds for graph
         if 'CORN' in types:
-            lb = min(strike) - .5*min(strike)
-            ub = max(strike) + .5*max(strike)
+            margin = .5*min(strike)
+            lb = min(strike) - margin
+            ub = max(strike) + margin
         elif ('WTI' in types)|('Brent' in types):
             if min(strike) > 50:
-                lb = min(strike) - .5*min(strike)
-                ub = max(strike) + .5*max(strike)
-            elif min(strike) >= 0:
-                lb = min(strike) - 2*min(strike)
-                ub = max(strike) + 1.25*max(strike)
+                margin = .5*min(strike)
+                lb = min(strike) - margin
+                ub = max(strike) + margin
+            elif min(strike) > 0:
+                margin = .5*min(strike)
+                lb = min(strike) - margin
+                ub = max(strike) + margin
             elif min(strike) < 0:
-                lb = min(strike) - .5*min(strike)
-                ub = max(strike) + .5*max(strike)
+                margin = .5*min(strike)
+                lb = min(strike) - margin
+                ub = max(strike) + margin
+            elif min(strike) == 0:
+                lb = -.5
+                ub = .5
         elif 'HH' in types:
-            lb = min(strike) - .15*min(strike)
-            ub = max(strike) + .15*max(strike)
+            margin = .15*min(strike)
+            lb = min(strike) - margin
+            ub = max(strike) + margin
         elif 'Ethanol' in types:
-            lb = min(strike) - .5*min(strike)
-            ub = max(strike) + .5*max(strike)
+            margin = .25*min(strike)
+            lb = min(strike) - margin
+            ub = max(strike) + margin
         elif 'LCFS' in types:
             lb = min(strike) - .25*min(strike)
             ub = max(strike) + .25*max(strike)
         elif 'Soybean' in types:
-            lb = min(strike) - .25*min(strike)
-            ub = max(strike) + .25*max(strike)
+            margin = .25*min(strike)
+            lb = min(strike) - margin
+            ub = max(strike) + margin
         else:
             print('Missing Bounds')
             pass
         
-        x = np.linspace(lb, ub)
-        
+        x = np.linspace(lb, ub, 1000)
+        r = .0266
         
         #Calculate option payoff
         pay_off = np.zeros(len(x))
+        pay_off2 = np.zeros(len(x))
         for i in range(len(strike)):
             if (lots[i] > 0) & (flavor[i] == 'Call'):
                 pay_off += (np.maximum((x - strike[i]), 0)-premium[i])*np.abs(lots[i])*lotsize
-                
+                try:
+                    pay_off2+= np.asarray([(BSM_Option(s, strike[i], get_year_deltas([dt.datetime.now(), \
+                                           date[i]])[1] , r, vol[i], 'Call').value()-premium[i])*np.abs(lots[i])*lotsize for s in x])
+                except:
+                    pass
             elif (lots[i] < 0) & (flavor[i] == 'Call'):
                 pay_off += (premium[i]-np.maximum(x - strike[i] , 0))*np.abs(lots[i])*lotsize
-                
+                try:
+                    pay_off2+= np.asarray([(premium[i]-BSM_Option(s, strike[i], get_year_deltas([dt.datetime.now(), \
+                           date[i]])[1] , r, vol[i], 'Call').value())*np.abs(lots[i])*lotsize for s in x])
+                except:
+                    pass                
             elif (lots[i] > 0) & (flavor[i] == 'Put'):
                 pay_off += (np.maximum(strike[i] - x, 0)-premium[i])*np.abs(lots[i])*lotsize
+                try:
+                    pay_off2+= np.asarray([(BSM_Option(s, strike[i], get_year_deltas([dt.datetime.now(), \
+                                           date[i]])[1] , r, vol[i], 'Put').value()-premium[i])*np.abs(lots[i])*lotsize for s in x])
+                except:
+                    pass
                 
             elif (lots[i] < 0) & (flavor[i] == 'Put'):
                 pay_off += (premium[i]-np.maximum(strike[i] - x, 0))*np.abs(lots[i])*lotsize
-        
+                try:
+                    pay_off2+= np.asarray([(premium[i]-BSM_Option(s, strike[i], get_year_deltas([dt.datetime.now(), \
+                           date[i]])[1] , r, vol[i], 'Put').value())*np.abs(lots[i])*lotsize for s in x])     
+                except:
+                    pass
         
         # Add intersection point of value 
-#        pos = fwd[idx]
         query = '''
         select top 1 prq_value from price_quotations where
         prs_symb = {} order by prq_date_value desc'''.format("'"+pos+"'")
@@ -330,7 +333,9 @@ def graph_payoff_nova(data):
         #Create Payoff grapgh
         plt.style.use('seaborn-whitegrid')
         fig, ax = plt.subplots(figsize = (10, 5))
-        plt.plot(x, pay_off, linewidth= 2, label = "Payoff Function")
+        plt.plot(x, pay_off, linewidth= 2, label = "Intrinsic Value")
+        if 'LCFS' not in types:
+            plt.plot(x, pay_off2, linewidth= 2, label = "Option Value")
         plt.grid(color='black', linestyle=':', linewidth=.5)
         plt.axhline(y=0, color='k') 
         plt.title('Payoff Diagram --- {}'.format(types))
@@ -339,11 +344,51 @@ def graph_payoff_nova(data):
         fmt = '${x:,.0f}'
         tick = mtick.StrMethodFormatter(fmt)
         ax.yaxis.set_major_formatter(tick)    
-        plt.axvline(price, color = "orange", linewidth = 2, label = 'Underlying Price')
+        plt.axvline(price, color = "orange", linewidth = 2, label = 'Underlying Price : ${:,.3f}'.format(price))
         plt.plot(price, int(val),'ro', markersize  = 10, label= "Current Value : ${:,.0f}".format(int(val)))
+        plt.plot([], [], ' ', label="Expiry : {:%m-%d-%Y}".format(date[0]))
         plt.legend(loc = 0, frameon = True)
         
+
+
+def GBM(S0, r, sigma, T, M, I):
+    dt = float(T) / M
+    paths = np.zeros((M + 1, I), np.float64)
+    paths[0] = S0
+    for t in range(1, M + 1):
+        rand = np.random.standard_normal(I)
+        rand = (rand - rand.mean()) / rand.std()
+        paths[t] = paths[t - 1] * np.exp((r - 0.5 * sigma ** 2) * dt +
+        sigma * np.sqrt(dt) * rand)
+    return paths
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
