@@ -123,6 +123,8 @@ def spread_option(s1, s2, k , t, sigma1, sigma2, cor, r):
     value = exp(-r*t)*(s1*stats.norm.cdf(d1, 0, 1) - s2*stats.norm.cdf(d2, 0, 1) - k*stats.norm.cdf(d3, 0 ,1))
     return value
     
+
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import pandas as pd
@@ -200,6 +202,7 @@ def graph_payoff_nova(data):
         
         temp = data.loc[data.Underlying == types, :]
         
+        # Remove any strikes with combined flat position
         strikes =  temp.Strike.unique().tolist()
         for strike in strikes:
             for flav in ['Call', 'Put']:
@@ -209,27 +212,15 @@ def graph_payoff_nova(data):
         if temp.shape[0] == 0:
             continue
 
-         
-        strike = temp.Strike
-        premium = temp.Premium
-        lots = temp.Qty
-        flavor = temp.Flavor
-        vol = temp['Imp. Volatility']
-        date = temp.Expiry
-        if type(strike) is pd.Series:
-            strike = strike.tolist()
-        if type(premium) is pd.Series:
-            premium = premium.tolist()
-        if type(lots) is pd.Series:
-            lots = lots.tolist()
-        if type(flavor) is pd.Series:
-            flavor = flavor.tolist()
-        if type(vol) is pd.Series:
-            vol = vol.tolist()
-        if type(date) is pd.Series:
-            date = date.tolist()
+        # Convert columns to list for iterations
+        strike = temp.Strike.tolist()
+        premium = temp.Premium.tolist()
+        lots = temp.Qty.tolist()
+        flavor = temp.Flavor.tolist()
+        vol = temp['Imp. Volatility'].tolist()
+        date = temp.Expiry.tolist()
             
-        # Set bounds for graph
+        # Set bounds for graph according to underlying
         if 'CORN' in types:
             margin = .5*min(strike)
             lb = min(strike) - margin
@@ -269,7 +260,10 @@ def graph_payoff_nova(data):
             print('Missing Bounds')
             pass
         
+        # Create bounds and granularity of option payoff
         x = np.linspace(lb, ub, 1000)
+        
+        # Interest rate for Black-Scholes model
         r = .0266
         
         #Calculate option payoff
@@ -348,10 +342,31 @@ def graph_payoff_nova(data):
         plt.plot(price, int(val),'ro', markersize  = 10, label= "Current Value : ${:,.0f}".format(int(val)))
         plt.plot([], [], ' ', label="Expiry : {:%m-%d-%Y}".format(date[0]))
         plt.legend(loc = 0, frameon = True)
-        
+
+
 
 
 def GBM(S0, r, sigma, T, M, I):
+    ''' Generates Monte Carlo paths for geometric Brownian motion.
+         Parameters
+         ==========
+         S0 : float
+             initial stock/index value
+         r : float
+             constant short rate
+         sigma : float
+             constant volatility
+         T : float
+             final time horizon
+         M : int
+             number of time steps/intervals
+         I : int
+             number of paths to be simulated
+         Returns
+         =======
+         paths : ndarray, shape (M + 1, I)
+             simulated paths given the parameters
+     '''
     dt = float(T) / M
     paths = np.zeros((M + 1, I), np.float64)
     paths[0] = S0
@@ -361,30 +376,6 @@ def GBM(S0, r, sigma, T, M, I):
         paths[t] = paths[t - 1] * np.exp((r - 0.5 * sigma ** 2) * dt +
         sigma * np.sqrt(dt) * rand)
     return paths
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
